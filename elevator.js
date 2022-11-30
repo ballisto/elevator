@@ -6,9 +6,9 @@
         floors.forEach(function(floor) {
             floors_requests[floor.floorNum()] = [0,0];
         });
-          
-      
-        const isFullRatio = 0.8;
+
+
+        const isFullRatio = 0.7;
         let mapRequestsTimestamps = new Map();
 
 
@@ -60,7 +60,7 @@
             };
             elevator.floorNumToFloor = function(floorNum) {
                 let curFloor;
-                
+
                 floors.forEach(function (floor) {
                     if ( floor.floorNum() === floorNum) {
                         curFloor = floor;
@@ -94,7 +94,7 @@
                 elevator.destinationQueue.splice(queueIndex, 1);
                 elevator.checkDestinationQueue();
             }
-    
+
             elevator.currentDestination = function(defaultFloorNum) {
                 return (elevator.destinationQueue.length > 0) ? elevator.destinationQueue[0] : defaultFloorNum;
             };
@@ -217,7 +217,7 @@
                             })
                             break;
                         default : optimizedQueue = elevator.destinationQueue;
-                        
+
                     }
                     elevator.destinationQueue = optimizedQueue;
                     elevator.checkDestinationQueue();
@@ -237,7 +237,7 @@
                 elevator.updateIndicators();
                 elevator.optimizeDestinationQueue();
 
-                console.log("Destination Queue -> " + elevator.destinationQueue);
+                // console.log("Destination Queue -> " + elevator.destinationQueue);
                 return true;
             };
         });
@@ -304,17 +304,30 @@
                 })
                 return result;
             };
+            floor.getRequest = function( direction) {
+                var directionArrayPos = 0;
+                switch (direction) {
+                    case 1: directionArrayPos = 0;
+                        break;
+                    case -1: directionArrayPos = 1;
+                        break;
+                    default: directionArrayPos = 0;
+                }
+                var floor_requests = floors_requests[floor.floorNum()];
+                return ( floor_requests[directionArrayPos] > 0);
+            }; 
             floor.setRequest = function( direction, setTo) {
                 var directionArrayPos = 0;
                 switch (direction) {
                     case 1: directionArrayPos = 0;
-                    break;
+                        break;
                     case -1: directionArrayPos = 1;
-                    break;
+                        if (setTo === 0 ) {console.log("FLOOR " + floor.floorNum() + " RESET DOWN");}
+                        break;
                     default: directionArrayPos = 0;
                 }
                 var floor_requests = floors_requests[floor.floorNum()];
-                
+
                 floor_requests[directionArrayPos] = setTo;
                 floors_requests[floor.floorNum()] = floor_requests;
 
@@ -323,27 +336,30 @@
             }; 
         });
 
-        
+
         elevators.forEach(function (elevator) {            
             elevator.on("idle", function() {                
                 // l
-                console.log("Elevator - " + elevator.elevatorToNum() + " - idle - status - " + elevator.status()); 
+                console.log("Elevator - " + elevator.elevatorToNum() + " - idle - status - " + elevator.status());
+                
                 elevator.goToFloor(elevator.closestFloorWithCustomers());
                 elevator.whatDo();
             });
             elevator.on("floor_button_pressed", function(floorNum) {
                 // l
                 console.log("Elevator - " + elevator.elevatorToNum() + " - floor btn prsd " + floorNum + " - status - " + elevator.status());
-                elevator.whatDo();
+                if (elevator.currentFloor() === 0 && elevator.loadFactor() < 0.6) {}
+                else { elevator.whatDo(); }
             });
             elevator.on("passing_floor", function(floorNum, direction) {                
-                
+
                 // do we stop or not
                 let curFloor = elevator.floorNumToFloor(floorNum);
-                console.log("Elevator - " + elevator.elevatorToNum() + " - passing floor " + floorNum + direction + " -hascust- " + curFloor.hasCustomersDirection(elevator.indicatorsToDirectionNum()));
-                if ( curFloor.hasCustomersDirection(elevator.indicatorsToDirectionNum())) {
+                console.log("Elevator - " + elevator.elevatorToNum() + " pass fl " + floorNum + direction + " -hascust- " + curFloor.hasCustomersDirection(elevator.indicatorsToDirectionNum()) + " load " + elevator.loadFactor());
+                if ( curFloor.hasCustomersDirection(elevator.indicatorsToDirectionNum()) && elevator.loadFactor() < isFullRatio) {
                     elevator.goToFloor(floorNum, true);
                 }
+                console.log("Floor " + floorNum + " req up " + curFloor.getRequest(0) + " req down " + curFloor.getRequest(-1) );
                 // elevator.whatDo();
             });
             elevator.on("stopped_at_floor", function(floorNum) {            
@@ -353,14 +369,18 @@
 
                 if (elevator.indicatorsToDirectionNum() === 1) {
                     curFloor.setRequest(1,0);
+                    console.log("Elevator - " + elevator.elevatorToNum() + " RESET UP" );
                 }
-                if (elevator.indicatorsToDirectionNum() === -1) {
+                else if (elevator.indicatorsToDirectionNum() === -1) {
                     curFloor.setRequest(-1,0);
+                    console.log("Elevator - " + elevator.elevatorToNum() + " RESET DOWN" );
                 }
                 else {
                     curFloor.setRequest(1,0);
                     curFloor.setRequest(-1,0);
+                    console.log("Elevator - " + elevator.elevatorToNum() + " RESET ALL!" );
                 }
+
                 elevator.whatDo();
             });
         });
@@ -374,12 +394,12 @@
             floor.on("down_button_pressed", function() {
                 // l
                 floor.setRequest(-1, 1);
-                
+
                 elevators.forEach(function (elevator) { elevator.whatDo() })
             });
         });
     },
-    update: function(dt, elevators, floors) {
-        // We normally don't need to do anything here
-    }
+        update: function(dt, elevators, floors) {
+            // We normally don't need to do anything here
+        }
 }
